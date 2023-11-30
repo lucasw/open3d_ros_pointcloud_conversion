@@ -14,3 +14,14 @@ catkin_package()
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
+
+install(PROGRAMS
+  scripts/pc2_to_pcd.py
+  scripts/pcd_to_pc2.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+foreach(dir data launch)
+  install(DIRECTORY ${dir}/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir})
+endforeach()

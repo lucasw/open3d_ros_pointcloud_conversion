@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+
+  <group ns="xyzrgb">
+
+    <node name="pcd_to_pc2" pkg="open3d_ros_pointcloud_conversion" type="pcd_to_pc2.py"
+        output="screen">
+      <param name="pcd" value="$(find open3d_ros_pointcloud_conversion)/data/test_cloud_XYZRGB.pcd" />
+    </node>
+
+    <node name="pc2_to_pcd" pkg="open3d_ros_pointcloud_conversion" type="pc2_to_pcd.py"
+        output="screen">
+      <param name="pcd" value="converted_xyzrgb.pcd" />
+    </node>
+
+  </group>
+
+  <group ns="xyz_norgb">
+
+    <node name="pcd_to_pc2" pkg="open3d_ros_pointcloud_conversion" type="pcd_to_pc2.py"
+        output="screen">
+      <param name="pcd" value="$(find open3d_ros_pointcloud_conversion)/data/test_cloud_XYZ_noRGB.pcd" />
+    </node>
+
+  </group>
+
+</launch>

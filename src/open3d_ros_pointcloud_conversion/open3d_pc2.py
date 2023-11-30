@@ -29,7 +29,7 @@ import numpy as np
 import open3d
 import rospy
 import sensor_msgs.point_cloud2 as pc2
-from sensor_msgs.msg import PointCloud2, PointField
+from sensor_msgs.msg import PointField
 from std_msgs.msg import Header
 
 # The data structure of each point in ros PointCloud2: 16 bits = x + y + z + rgb
@@ -120,71 +120,3 @@ def convertCloudFromRosToOpen3d(ros_cloud):
 
     # return
     return open3d_cloud
-
-
-# -- Example of usage
-if __name__ == "__main__":
-    rospy.init_node('test_pc_conversion_between_Open3D_and_ROS', anonymous=True)
-
-    # -- Read point cloud from file
-    import os
-    PYTHON_FILE_PATH = os.path.join(os.path.dirname(__file__)) + "/"
-    if 0:  # test XYZ point cloud format
-        filename = PYTHON_FILE_PATH + "test_cloud_XYZ_noRGB.pcd"
-    else:  # test XYZRGB point cloud format
-        filename = PYTHON_FILE_PATH + "test_cloud_XYZRGB.pcd"
-
-    open3d_cloud = open3d.io.read_point_cloud(filename)
-    rospy.loginfo("Loading cloud from file by open3d.read_point_cloud: ")
-    print(open3d_cloud)
-    print("")
-
-    # -- Set publisher
-    topic_name = "kinect2/qhd/points"
-    pub = rospy.Publisher(topic_name, PointCloud2, queue_size=1)
-
-    # -- Set subscriber
-    global received_ros_cloud
-    received_ros_cloud = None
-
-    def callback(ros_cloud):
-        global received_ros_cloud
-        received_ros_cloud = ros_cloud
-        rospy.loginfo("-- Received ROS PointCloud2 message.")
-    rospy.Subscriber(topic_name, PointCloud2, callback)
-
-    # -- Convert open3d_cloud to ros_cloud, and publish. Until the subscribe receives it.
-    while received_ros_cloud is None and not rospy.is_shutdown():
-        rospy.loginfo("-- Not receiving ROS PointCloud2 message yet ...")
-
-        if 1:  # Use the cloud from file
-            rospy.loginfo("Converting cloud from Open3d to ROS PointCloud2 ...")
-            ros_cloud = convertCloudFromOpen3dToRos(open3d_cloud)
-
-        else:  # Use the cloud with 3 points generated below
-            rospy.loginfo("Converting a 3-point cloud into ROS PointCloud2 ...")
-            TEST_CLOUD_POINTS = [
-                [1.0, 0.0, 0.0, 0xff0000],
-                [0.0, 1.0, 0.0, 0x00ff00],
-                [0.0, 0.0, 1.0, 0x0000ff],
-            ]
-            ros_cloud = pc2.create_cloud(
-                Header(frame_id="odom"), FIELDS_XYZ, TEST_CLOUD_POINTS)
-
-        # publish cloud
-        pub.publish(ros_cloud)
-        rospy.loginfo("Conversion and publish success ...\n")
-        rospy.sleep(1)
-
-    # -- After subscribing the ros cloud, convert it back to open3d, and draw
-    received_open3d_cloud = convertCloudFromRosToOpen3d(received_ros_cloud)
-    print(received_open3d_cloud)
-
-    # write to file
-    output_filename = PYTHON_FILE_PATH + "conversion_result.pcd"
-    open3d.io.write_point_cloud(output_filename, received_open3d_cloud)
-    rospy.loginfo("-- Write result point cloud to: " + output_filename)
-
-    # draw
-    open3d.visualization.draw_geometries([received_open3d_cloud])
-    rospy.loginfo("-- Finish display. The program is terminating ...\n")
