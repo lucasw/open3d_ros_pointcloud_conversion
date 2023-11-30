@@ -39,7 +39,7 @@ FIELDS_XYZ = [
     PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1),
 ]
 FIELDS_XYZRGB = FIELDS_XYZ + \
-    [PointField(name='rgb', offset=12, datatype=PointField.UINT32, count=1)]
+    [PointField(name='rgba', offset=12, datatype=PointField.UINT32, count=1)]
 
 # Bit operations
 BIT_MOVE_16 = 2**16
@@ -62,17 +62,26 @@ def convertCloudFromOpen3dToRos(open3d_cloud, frame_id="odom"):
     header.frame_id = frame_id
 
     # Set "fields" and "cloud_data"
-    points = np.asarray(open3d_cloud.points)
+    points = np.asarray(open3d_cloud.points, np.float32)
+    print(points.shape)
     if not open3d_cloud.colors:  # XYZ only
+        print("xyz")
         fields = FIELDS_XYZ
         cloud_data = points
     else:  # XYZ + RGB
+        print("xyz + rgba")
         fields = FIELDS_XYZRGB
         # -- Change rgb color from "three float" to "one 24-byte int"
         # 0x00FFFFFF is white, 0x00000000 is black.
         colors = np.floor(np.asarray(open3d_cloud.colors) * 255)  # nx3 matrix
-        colors = colors[:, 0] * BIT_MOVE_16 + colors[:, 1] * BIT_MOVE_8 + colors[:, 2]
-        cloud_data = np.c_[points, colors]
+        colors = colors.astype(np.uint32)
+        colors = 0xFF000000 + colors[:, 0] * BIT_MOVE_16 + colors[:, 1] * BIT_MOVE_8 + colors[:, 2]
+        cloud_data = np.rec.fromarrays([points[:, 0], points[:, 1] , points[:, 2], colors])
+        # TODO(lucasw) this is ~3x slower than fromarrays
+        # cloud_data = [tuple((*p, c)) for p, c in zip(points, colors)]
+        # print(f"list comp {len(cloud_data)} {type(cloud_data[0][3])}")
+
+    rospy.loginfo((rospy.Time.now() - header.stamp).to_sec())
 
     # create ros_cloud
     return pc2.create_cloud(header, fields, cloud_data)
@@ -84,13 +93,13 @@ def convertCloudFromRosToOpen3d(ros_cloud):
     cloud_data = list(pc2.read_points(ros_cloud, skip_nans=True, field_names=field_names))
 
     # Check empty
-    open3d_cloud = open3d.PointCloud()
+    open3d_cloud = open3d.geometry.PointCloud()
     if len(cloud_data) == 0:
         print("Converting an empty cloud")
         return None
 
     # Set open3d_cloud
-    if "rgb" in field_names:
+    if "rgba" in field_names:
         IDX_RGB_IN_FIELD = 3  # x, y, z, rgb
 
         # Get xyz
@@ -104,11 +113,11 @@ def convertCloudFromRosToOpen3d(ros_cloud):
             rgb = [convert_rgbUint32_to_tuple(rgb) for x, y, z, rgb in cloud_data]
 
         # combine
-        open3d_cloud.points = open3d.Vector3dVector(np.array(xyz))
-        open3d_cloud.colors = open3d.Vector3dVector(np.array(rgb) / 255.0)
+        open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
+        open3d_cloud.colors = open3d.utility.Vector3dVector(np.array(rgb) / 255.0)
     else:
         xyz = [(x, y, z) for x, y, z in cloud_data]  # get xyz
-        open3d_cloud.points = open3d.Vector3dVector(np.array(xyz))
+        open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
 
     # return
     return open3d_cloud
@@ -126,7 +135,7 @@ if __name__ == "__main__":
     else:  # test XYZRGB point cloud format
         filename = PYTHON_FILE_PATH + "test_cloud_XYZRGB.pcd"
 
-    open3d_cloud = open3d.read_point_cloud(filename)
+    open3d_cloud = open3d.io.read_point_cloud(filename)
     rospy.loginfo("Loading cloud from file by open3d.read_point_cloud: ")
     print(open3d_cloud)
     print("")
@@ -174,9 +183,9 @@ if __name__ == "__main__":
 
     # write to file
     output_filename = PYTHON_FILE_PATH + "conversion_result.pcd"
-    open3d.write_point_cloud(output_filename, received_open3d_cloud)
+    open3d.io.write_point_cloud(output_filename, received_open3d_cloud)
     rospy.loginfo("-- Write result point cloud to: " + output_filename)
 
     # draw
-    open3d.draw_geometries([received_open3d_cloud])
+    open3d.visualization.draw_geometries([received_open3d_cloud])
     rospy.loginfo("-- Finish display. The program is terminating ...\n")
