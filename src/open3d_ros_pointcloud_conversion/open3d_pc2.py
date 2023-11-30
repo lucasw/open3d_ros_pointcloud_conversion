@@ -29,7 +29,10 @@ import numpy as np
 import open3d
 import rospy
 import sensor_msgs.point_cloud2 as pc2
-from sensor_msgs.msg import PointField
+from sensor_msgs.msg import (
+    PointCloud2,
+    PointField,
+)
 from std_msgs.msg import Header
 
 # The data structure of each point in ros PointCloud2: 16 bits = x + y + z + rgb
@@ -86,19 +89,23 @@ def convertCloudFromOpen3dToRos(open3d_cloud, frame_id="odom", stamp=None):
     return pc2.create_cloud(header, fields, cloud_data)
 
 
-def convertCloudFromRosToOpen3d(ros_cloud):
+def convertCloudFromRosToOpen3d(ros_cloud: PointCloud2):
     # Get cloud data from ros_cloud
     field_names = [field.name for field in ros_cloud.fields]
     cloud_data = list(pc2.read_points(ros_cloud, skip_nans=True, field_names=field_names))
 
+    num_points = len(cloud_data)
     # Check empty
-    open3d_cloud = open3d.geometry.PointCloud()
-    if len(cloud_data) == 0:
-        print("Converting an empty cloud")
+    if num_points < 100:
+        rospy.logerr(f"too few points in cloud {num_points}")
         return None
 
+    open3d_cloud = open3d.geometry.PointCloud()
+    fields = "".join(field_names)
+
+    # TODO(lucasw) these list comprehensions are going to be slow
     # Set open3d_cloud
-    if "rgba" in field_names:
+    if fields == "xyzrgba":
         IDX_RGB_IN_FIELD = 3  # x, y, z, rgb
 
         # Get xyz
@@ -114,9 +121,14 @@ def convertCloudFromRosToOpen3d(ros_cloud):
         # combine
         open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
         open3d_cloud.colors = open3d.utility.Vector3dVector(np.array(rgb) / 255.0)
-    else:
+    elif fields == "xyz":
         xyz = [(x, y, z) for x, y, z in cloud_data]  # get xyz
         open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
+    elif fields == "xyzi":
+        xyz = [(x, y, z) for x, y, z, _ in cloud_data]  # get xyzi
+        open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
+    else:
+        rospy.logwarn_throttle(4.0, f"unsupported fields {fields}")
 
     # return
     return open3d_cloud
