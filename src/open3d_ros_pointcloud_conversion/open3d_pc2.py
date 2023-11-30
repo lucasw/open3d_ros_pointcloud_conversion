@@ -55,33 +55,32 @@ def convert_rgbFloat_to_tuple(rgb_float):
 
 
 # Convert the datatype of point cloud from Open3D to ROS PointCloud2 (XYZRGB only)
-def convertCloudFromOpen3dToRos(open3d_cloud, frame_id="odom"):
+def convertCloudFromOpen3dToRos(open3d_cloud, frame_id="odom", stamp=None):
     # Set "header"
     header = Header()
-    header.stamp = rospy.Time.now()
+    if stamp is None:
+        stamp = rospy.Time.now()
+    header.stamp = stamp
     header.frame_id = frame_id
 
     # Set "fields" and "cloud_data"
     points = np.asarray(open3d_cloud.points, np.float32)
-    print(points.shape)
     if not open3d_cloud.colors:  # XYZ only
-        print("xyz")
         fields = FIELDS_XYZ
         cloud_data = points
     else:  # XYZ + RGB
-        print("xyz + rgba")
         fields = FIELDS_XYZRGB
         # -- Change rgb color from "three float" to "one 24-byte int"
         # 0x00FFFFFF is white, 0x00000000 is black.
         colors = np.floor(np.asarray(open3d_cloud.colors) * 255)  # nx3 matrix
         colors = colors.astype(np.uint32)
         colors = 0xFF000000 + colors[:, 0] * BIT_MOVE_16 + colors[:, 1] * BIT_MOVE_8 + colors[:, 2]
-        cloud_data = np.rec.fromarrays([points[:, 0], points[:, 1] , points[:, 2], colors])
+        cloud_data = np.rec.fromarrays([points[:, 0], points[:, 1], points[:, 2], colors])
         # TODO(lucasw) this is ~3x slower than fromarrays
         # cloud_data = [tuple((*p, c)) for p, c in zip(points, colors)]
         # print(f"list comp {len(cloud_data)} {type(cloud_data[0][3])}")
 
-    rospy.loginfo((rospy.Time.now() - header.stamp).to_sec())
+    # rospy.loginfo((rospy.Time.now() - header.stamp).to_sec())
 
     # create ros_cloud
     return pc2.create_cloud(header, fields, cloud_data)
