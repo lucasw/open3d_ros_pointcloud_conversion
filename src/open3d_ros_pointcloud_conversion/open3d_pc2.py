@@ -94,11 +94,12 @@ def convertCloudFromRosToOpen3d(ros_cloud: PointCloud2):
     field_names = [field.name for field in ros_cloud.fields]
     cloud_data = list(pc2.read_points(ros_cloud, skip_nans=True, field_names=field_names))
 
+    intensity = None
     num_points = len(cloud_data)
     # Check empty
     if num_points < 100:
         rospy.logerr(f"too few points in cloud {num_points}")
-        return None
+        return None, intensity
 
     open3d_cloud = open3d.geometry.PointCloud()
     fields = "".join(field_names)
@@ -125,10 +126,10 @@ def convertCloudFromRosToOpen3d(ros_cloud: PointCloud2):
         xyz = [(x, y, z) for x, y, z in cloud_data]  # get xyz
         open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
     elif fields == "xyzi":
-        xyz = [(x, y, z) for x, y, z, _ in cloud_data]  # get xyzi
-        open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
+        xyzi = np.array([(x, y, z, i) for x, y, z, i in cloud_data])  # get xyzi
+        open3d_cloud.points = open3d.utility.Vector3dVector(xyzi[:, :3])
+        intensity = xyzi[:, 3]
     else:
         rospy.logwarn_throttle(4.0, f"unsupported fields {fields}")
 
-    # return
-    return open3d_cloud
+    return open3d_cloud, intensity
