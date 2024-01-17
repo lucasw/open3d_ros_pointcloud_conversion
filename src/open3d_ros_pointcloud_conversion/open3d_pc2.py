@@ -97,8 +97,8 @@ def convertCloudFromRosToOpen3d(ros_cloud: PointCloud2):
     intensity = None
     num_points = len(cloud_data)
     # Check empty
-    if num_points < 100:
-        rospy.logerr(f"too few points in cloud {num_points}")
+    if num_points == 0:
+        rospy.logerr(f"no points in cloud {num_points}")
         return None, intensity
 
     open3d_cloud = open3d.geometry.PointCloud()
