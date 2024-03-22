@@ -122,13 +122,13 @@ def convertCloudFromRosToOpen3d(ros_cloud: PointCloud2):
         # combine
         open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
         open3d_cloud.colors = open3d.utility.Vector3dVector(np.array(rgb) / 255.0)
-    elif fields == "xyz":
-        xyz = [(x, y, z) for x, y, z in cloud_data]  # get xyz
-        open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
     elif fields == "xyzi":
         xyzi = np.array([(x, y, z, i) for x, y, z, i in cloud_data])  # get xyzi
         open3d_cloud.points = open3d.utility.Vector3dVector(xyzi[:, :3])
         intensity = xyzi[:, 3]
+    elif fields.startswith("xyz"):
+        xyz = [(xyz_etc[0], xyz_etc[1], xyz_etc[2]) for xyz_etc in cloud_data]  # get xyz
+        open3d_cloud.points = open3d.utility.Vector3dVector(np.array(xyz))
     else:
         rospy.logwarn_throttle(4.0, f"unsupported fields {fields}")
 
